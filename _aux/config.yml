@@ -1,0 +1,6 @@
+---
+#
+# IP address for the VM
+# It creates a private network between the host and the VM (e.g. 172.20.99.0/24)
+#
+external_ip: "192.168.56.12"

@@ -1,0 +1,16 @@
+.vagrant
+.DS_Store
+*.log
+*.swp
+.idea
+config.ts
+iconfig.js
+.nyc_output
+config.js
+node-*.tar*
+.vscode
+node_modules
+dist
+__debug*
+*~
+.ansible

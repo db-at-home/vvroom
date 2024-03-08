@@ -1,0 +1,200 @@
+---
+- name: Ansible config for Vagrant provision of saffron
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: true
+  vars:
+    notvagrant: vagrant  # re-use the vagrant|vagrant user instead of making a new one
+    my_hostname: saffron # vm hostname
+    dev_dir: /vagrant/_dev
+    nodejs_dir: /usr/local/lib/nodejs
+    nvm_ver: v0.35.3
+    node_ver: v18.17.0
+    node_arch: "{{ ansible_architecture | regex_replace('^(aarch64)$', 'linux-arm64') | regex_replace('^(x86_64)$', 'linux-x64') }}"
+    node_path: "{{ node_ver }}-{{ node_arch }}"
+    my_env_vars:
+      PATH: $PATH:{{ nodejs_dir }}/{{ node_path }}/bin
+
+  tasks:
+    - name: Set hostname
+      ansible.builtin.hostname:
+        name: "{{ my_hostname }}"
+
+    - name: Set the hostname file content
+      ansible.builtin.copy:
+        dest: "/etc/hostname"
+        content: "{{ my_hostname }}"
+        mode: "644"
+
+    - name: Install some packages
+      ansible.builtin.package:
+        name:
+          - bzip2
+          - gcc
+          - git
+          - make
+          - osc
+          - perl
+          - rsync
+          - unzip
+        state: present
+
+    - name: Install xz for opensuse
+      ansible.builtin.package:
+        name:
+          - xz
+        state: present
+      when: ansible_distribution == "openSUSE Leap"
+
+    - name: Add GPG key for Google Cloud packages
+      when: ansible_distribution != 'Amazon'  # Exclude Amazon Linux
+      block:
+        - name: Add GPG key for apt (Debian-based systems)
+          ansible.builtin.apt_key:
+            url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+            state: present
+          when: ansible_os_family == 'Debian'
+
+        - name: Add GPG key for rpm (RedHat-based systems)
+          ansible.builtin.rpm_key:
+            key: https://packages.cloud.google.com/yum/doc/yum-key.gpg
+            state: present
+          when: ansible_os_family == 'RedHat' or ansible_os_family == 'SUSE'
+
+    - name: Download Node.js tarball based on architecture
+      ansible.builtin.get_url:
+        url: https://nodejs.org/dist/{{ node_ver }}/node-{{ node_path }}.tar.xz
+        dest: /tmp
+
+    - name: Creates nodejs directory
+      ansible.builtin.file:
+        dest: "{{ nodejs_dir }}"
+        state: directory
+
+    - name: Extract Node.js tarball
+      ansible.builtin.unarchive:
+        src: /tmp/node-{{ node_path }}.tar.xz
+        dest: "{{ nodejs_dir }}"
+        remote_src: true
+
+    - name: Make sure env is adjusted for users
+      ansible.builtin.copy:
+        dest: /etc/profile.d/{{ my_hostname }}.sh
+        content: |
+          export PATH=$PATH:{{ nodejs_dir }}/node-{{ node_path }}/bin
+          export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+          export GOPATH=/snap/bin/go
+
+    - name: Download NVM installation script
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_ver }}/install.sh
+        dest: /tmp/install_nvm.sh
+        mode: "0755"
+
+    - name: Execute NVM installation script
+      ansible.builtin.script: /tmp/install_nvm.sh
+
+    - name: Install snap package
+      community.general.snap:
+        name: "{{ item }}"
+        state: present
+        classic: true
+      when: ansible_os_family == 'Debian'
+      with_items:
+        - go
+        - google-cloud-sdk
+        - kubectl
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: Install deb packages
+      ansible.builtin.package:
+        name:
+          - docker.io
+          # - google-cloud-sdk-gke-gcloud-auth-plugin
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add golang repository for leap
+      community.general.zypper_repository:
+        name: go
+        repo: https://download.opensuse.org/repositories/devel:/languages:/go/15.5/
+        auto_import_keys: true
+        autorefresh: true
+      when: ansible_distribution == "openSUSE Leap"
+
+    - name: Install leap packages
+      ansible.builtin.package:
+        name:
+          - go
+          - docker
+          - iptables
+          - firewalld
+          - kernel-devel
+          - kernel-default-devel
+        state: present
+      when: ansible_distribution == "openSUSE Leap"
+
+    - name: Create user id
+      ansible.builtin.user:
+        name: "{{ notvagrant }}"
+        shell: /bin/bash
+        state: present
+        groups: users,docker
+
+    - name: Determine public interface name
+      ansible.builtin.set_fact:
+        public_ifname: "{{ ansible_default_ipv4.interface }}"
+
+    - name: Apply iptables rule with dynamic interface name
+      ansible.builtin.shell: |
+        iptables -t nat -A PREROUTING -i {{ public_ifname }} -p tcp --dport 8086 -j REDIRECT --to-port 8086
+
+    - name: Add conf files to telegraf.d
+      become_user: "{{ notvagrant }}"
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /home/{{ notvagrant }}
+        mode: "0644"
+      with_fileglob:
+        - /vagrant/provisioning/.vimrc
+
+    - name: Provide sudo passwordless
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ notvagrant }}"
+        content: "{{ notvagrant }} ALL=(ALL) NOPASSWD: ALL"
+        mode: "400"
+
+    - name: Add authorized_keys for remote user
+      ansible.posix.authorized_key:
+        user: "{{ notvagrant }}"
+        key: "{{ item }} {{ notvagrant }}"
+        state: present
+      with_items:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGnygm4PngHI1rMohD3rwZ8exVUjBp+WQhDuUPOgDkiG
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIMi7opzFIhXv9QVbroDd5ND+ouFwy1kxkzFG4E5nZr
+
+    - name: Enable and start the docker service
+      ansible.builtin.service:
+        name: docker
+        enabled: true
+        state: started
+
+    # - name: Install Open Build Service Client tools
+    #   community.general.zypper_repository:
+    #     repo: http://download.opensuse.org/repositories/openSUSE:/Tools/openSUSE_Tumbleweed/openSUSE:Tools.repo
+    #     state: present
+    #     auto_import_keys: true
+    #     runrefresh: true
+    #
+    # - name: Install some packages
+    #   ansible.builtin.package:
+    #     name:
+    #       - osc
+    #     state: present
