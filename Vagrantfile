@@ -44,10 +44,10 @@ Vagrant.configure("2") do |config|
       prov.customize ["modifyvm", :id, "--vram", "32"]
       prov.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
       # need a cdrom to mount the extensions ISO
-      prov.name = "vvroomVM"
-      system("VBoxManage storagectl vvroomVM --name IDE --remove 2>&1")
-      system("VBoxManage storagectl vvroomVM --name IDE --add ide 2>&1")
-      system("VBoxManage storageattach vvroomVM --storagectl IDE --port 0 --device 0 --type dvddrive --medium emptydrive 2>&1")
+      prov.name = "vvroom"
+      system("VBoxManage storagectl vvroom --name IDE --remove 2>&1")
+      system("VBoxManage storagectl vvroom --name IDE --add ide 2>&1")
+      system("VBoxManage storageattach vvroom --storagectl IDE --port 0 --device 0 --type dvddrive --medium emptydrive 2>&1")
     end
 
     # Display the VirtualBox GUI when booting the machine
@@ -58,9 +58,9 @@ Vagrant.configure("2") do |config|
     prov.memory = "2048"
   end
 
-  config.vm.synced_folder "./provisioning", "/vagrant/provisioning"
-  config.vm.synced_folder "./server", "/vagrant/server"
-  config.vm.synced_folder "./web", "/vagrant/web"
+  #config.vm.synced_folder "./provisioning", "/vagrant/provisioning"
+  #config.vm.synced_folder "./server", "/vagrant/server"
+  #config.vm.synced_folder "./web", "/vagrant/web"
 
   # View the documentation for the provider you are using for more
   # information on available options.

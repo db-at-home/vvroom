@@ -1,12 +1,12 @@
 ---
-- name: Ansible config for Vagrant provision of saffron
+- name: Ansible config for Vagrant provision of vvroom
   hosts: localhost
   connection: local
   gather_facts: true
   become: true
   vars:
     notvagrant: vagrant  # re-use the vagrant|vagrant user instead of making a new one
-    my_hostname: saffron # vm hostname
+    my_hostname: vvroom # vm hostname
     dev_dir: /vagrant/_dev
     nodejs_dir: /usr/local/lib/nodejs
     nvm_ver: v0.35.3
