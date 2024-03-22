@@ -54,8 +54,9 @@ Vagrant.configure("2") do |config|
     # uncomment this when adding the cdrom to inject the extensions ISO for mounting/install of tools
     prov.gui = true
 
-    # Customize the amount of memory on the VM:
-    prov.memory = "2048"
+    # Customize the cpu count and memory on the VM:
+    prov.memory = "4096"
+    prov.cpus = 4
   end
 
   #config.vm.synced_folder "./provisioning", "/vagrant/provisioning"

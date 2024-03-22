@@ -10,7 +10,8 @@
     dev_dir: /vagrant/_dev
     nodejs_dir: /usr/local/lib/nodejs
     nvm_ver: v0.35.3
-    node_ver: v18.17.0
+    #node_ver: v18.17.0
+    node_ver: v20.11.1
     node_arch: "{{ ansible_architecture | regex_replace('^(aarch64)$', 'linux-arm64') | regex_replace('^(x86_64)$', 'linux-x64') }}"
     node_path: "{{ node_ver }}-{{ node_arch }}"
     my_env_vars:
@@ -158,6 +159,7 @@
 
     - name: Add conf files to telegraf.d
       become_user: "{{ notvagrant }}"
+      become: true
       ansible.builtin.copy:
         src: "{{ item }}"
         dest: /home/{{ notvagrant }}
@@ -186,6 +188,13 @@
         enabled: true
         state: started
 
+#    - name: Install node packages globally
+#      community.general.npm:
+#        name: "{{ item }}"
+#        global: true
+#      with_items:
+#        - yarn
+#
     # - name: Install Open Build Service Client tools
     #   community.general.zypper_repository:
     #     repo: http://download.opensuse.org/repositories/openSUSE:/Tools/openSUSE_Tumbleweed/openSUSE:Tools.repo
