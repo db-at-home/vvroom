@@ -44,7 +44,9 @@ Vagrant.configure("2") do |config|
       prov.vmx["ide1:0.deviceType"] = "cdrom-raw"
       prov.vmx["memsize"] = "4096"
       prov.vmx["numvcpus"] = "4"
-    
+      prov.vmx["vhv.enable"] = "TRUE"
+      prov.vmx["vvtd.enable"] = "TRUE"
+         
     elsif provider == "virtualbox"
       # might be a bug with this adding dup interfaces on multiple vagrant up or provision invocations
       #config.vm.network "private_network", ip: setup['external_ip']
