@@ -5,8 +5,8 @@
 # Load config
 # 
 require 'yaml'
-setup = YAML.load_file('_aux/config.yml')
-setup['external_ip'] = '172.21.1.2' unless setup['external_ip']
+#setup = YAML.load_file('_aux/config.yml')
+#setup['external_ip'] = '172.21.1.2' unless setup['external_ip']
 
 Vagrant.configure("2") do |config|
   # The most common configuration options are documented and commented below.
@@ -20,27 +20,34 @@ Vagrant.configure("2") do |config|
  
   if is_arm64()
     #config.vm.box = "opensuse/Leap-15.5.aarch64"
-    config.vm.box = "bento/ubuntu-23.10-arm64"
+    config.vm.box = "bento/ubuntu-24.04"
     # config.vm.box = "focal-server2"
     provider = "vmware_fusion"
   else
-    config.vm.box = "opensuse/Leap-15.5.x86_64"
-    # config.vm.box = "bento/ubuntu-23.10"
-    provider = "virtualbox"
+    # config.vm.box = "opensuse/Leap-15.5.x86_64"
+    config.vm.box = "bento/ubuntu-24.04"
+    # provider = "virtualbox"
+    provider = "vmware_fusion"
   end
 
+  config.vm.box_check_update = false
   config.vm.hostname = "vvroom"
-  # config.disksize.size = "4GB"
+  #config.vm.network :private_network
 
   config.vm.provider provider do |prov|
     if provider == "vmware_fusion"
-      # prov.vmx["ethernet1.virutalDev"] = "e1000"
+      prov.allowlist_verified = true
+      #prov.vmx["ethernet1.virutalDev"] = "vmxnet3"
       prov.vmx["ethernet0.virtualDev"] = "vmxnet3"
+      #prov.vmx["ethernet0.generatedAddress"] = "00:0C:29:00:31:9D"
       prov.vmx["ide1:0.present"] = "TRUE"
-      prov.vmx["ide1:0.deviceType"] = "cdrom-raw"    
+      prov.vmx["ide1:0.deviceType"] = "cdrom-raw"
+      prov.vmx["memsize"] = "4096"
+      prov.vmx["numvcpus"] = "4"
+    
     elsif provider == "virtualbox"
       # might be a bug with this adding dup interfaces on multiple vagrant up or provision invocations
-      config.vm.network "private_network", ip: setup['external_ip']
+      #config.vm.network "private_network", ip: setup['external_ip']
       prov.customize ["modifyvm", :id, "--vram", "32"]
       prov.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
       # need a cdrom to mount the extensions ISO
@@ -48,6 +55,7 @@ Vagrant.configure("2") do |config|
       system("VBoxManage storagectl vvroom --name IDE --remove 2>&1")
       system("VBoxManage storagectl vvroom --name IDE --add ide 2>&1")
       system("VBoxManage storageattach vvroom --storagectl IDE --port 0 --device 0 --type dvddrive --medium emptydrive 2>&1")
+
     end
 
     # Display the VirtualBox GUI when booting the machine
@@ -72,8 +80,8 @@ Vagrant.configure("2") do |config|
     case $osid in
       ubuntu)
         while fuser /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 1; done;
-        apt update
-        apt install -y python3-pip && echo Pip3 installation complete.
+        apt-get update
+        apt-get install -y python3-pip && echo Pip3 installation complete.
         ln -f /usr/bin/python3 /usr/bin/python && echo Python default version was changed to 3.
         pip install --break-system-packages --upgrade ansible yamllint
         ;;
