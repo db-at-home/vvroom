@@ -104,7 +104,7 @@ Vagrant.configure("2") do |config|
     ansible.install_mode = "pip"
     ansible.limit = 'all,localhost'
     ansible.compatibility_mode = "2.0"
-    ansible.playbook = "_aux/vvroom-ansible-local.yml"
+    ansible.playbook = "_aux/ansible-local.yml"
     ansible.galaxy_role_file = "_aux/galaxy.yml"
     # ansible.galaxy_roles_path = ".ansible/collections"
     ansible.galaxy_command = "ansible-galaxy collection install -r %{role_file}" # -p %{roles_path}"
