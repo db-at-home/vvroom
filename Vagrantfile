@@ -32,14 +32,13 @@ Vagrant.configure("2") do |config|
 
   config.vm.box_check_update = false
   config.vm.hostname = "vvroom"
-  #config.vm.network :private_network
+  config.vm.network :private_network, ip: "10.0.10.2"
 
   config.vm.provider provider do |prov|
     if provider == "vmware_fusion"
       prov.allowlist_verified = true
-      #prov.vmx["ethernet1.virutalDev"] = "vmxnet3"
+      prov.vmx["ethernet1.virutalDev"] = "vmxnet3"
       prov.vmx["ethernet0.virtualDev"] = "vmxnet3"
-      #prov.vmx["ethernet0.generatedAddress"] = "00:0C:29:00:31:9D"
       prov.vmx["ide1:0.present"] = "TRUE"
       prov.vmx["ide1:0.deviceType"] = "cdrom-raw"
       prov.vmx["memsize"] = "4096"
@@ -49,7 +48,6 @@ Vagrant.configure("2") do |config|
          
     elsif provider == "virtualbox"
       # might be a bug with this adding dup interfaces on multiple vagrant up or provision invocations
-      #config.vm.network "private_network", ip: setup['external_ip']
       prov.customize ["modifyvm", :id, "--vram", "32"]
       prov.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
       # need a cdrom to mount the extensions ISO
@@ -62,7 +60,7 @@ Vagrant.configure("2") do |config|
 
     # Display the VirtualBox GUI when booting the machine
     # uncomment this when adding the cdrom to inject the extensions ISO for mounting/install of tools
-    prov.gui = true
+    # prov.gui = true
 
     # Customize the cpu count and memory on the VM:
     prov.memory = "4096"
