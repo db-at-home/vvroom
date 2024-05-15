@@ -30,22 +30,30 @@ Vagrant.configure("2") do |config|
     provider = "vmware_fusion"
   end
 
-  config.vm.box_check_update = false
   config.vm.hostname = "vvroom"
+  config.vm.box_check_update = false
   config.vm.network :private_network, ip: "10.0.10.2"
 
   config.vm.provider provider do |prov|
+    # Display the VirtualBox GUI when booting the machine
+    # uncomment this when adding the cdrom to inject the extensions ISO for mounting/install of tools
+    # prov.gui = true
+
+    # Customize the cpu count and memory on the VM:
+    prov.memory = "2048"
+    prov.cpus = 4
+    prov.allowlist_verified = true
+
     if provider == "vmware_fusion"
-      prov.allowlist_verified = true
-      prov.vmx["ethernet1.virutalDev"] = "vmxnet3"
       prov.vmx["ethernet0.virtualDev"] = "vmxnet3"
+      prov.vmx["ethernet1.virutalDev"] = "vmxnet3"
       prov.vmx["ide1:0.present"] = "TRUE"
       prov.vmx["ide1:0.deviceType"] = "cdrom-raw"
-      prov.vmx["memsize"] = "4096"
+      prov.vmx["memsize"] = "2048"
       prov.vmx["numvcpus"] = "4"
       prov.vmx["vhv.enable"] = "TRUE"
       prov.vmx["vvtd.enable"] = "TRUE"
-         
+
     elsif provider == "virtualbox"
       # might be a bug with this adding dup interfaces on multiple vagrant up or provision invocations
       prov.customize ["modifyvm", :id, "--vram", "32"]
@@ -57,19 +65,7 @@ Vagrant.configure("2") do |config|
       system("VBoxManage storageattach vvroom --storagectl IDE --port 0 --device 0 --type dvddrive --medium emptydrive 2>&1")
 
     end
-
-    # Display the VirtualBox GUI when booting the machine
-    # uncomment this when adding the cdrom to inject the extensions ISO for mounting/install of tools
-    # prov.gui = true
-
-    # Customize the cpu count and memory on the VM:
-    prov.memory = "4096"
-    prov.cpus = 4
   end
-
-  #config.vm.synced_folder "./provisioning", "/vagrant/provisioning"
-  #config.vm.synced_folder "./server", "/vagrant/server"
-  #config.vm.synced_folder "./web", "/vagrant/web"
 
   # View the documentation for the provider you are using for more
   # information on available options.
