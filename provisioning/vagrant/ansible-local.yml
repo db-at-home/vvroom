@@ -1,0 +1,360 @@
+---
+- name: Ansible config for Vagrant provision of vvroom
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: true
+  vars:
+    notvagrant: vagrant  # re-use the vagrant|vagrant user instead of making a new one
+    my_hostname: vvroom # vm hostname
+    dev_dir: /vagrant/provisioning/vagrant
+    leapver: 15.6
+
+    nodejs_dir: /usr/local/lib/nodejs
+    nvm_ver: v0.35.3
+    node_ver: v22.0.0
+    node_arch: "{{ ansible_architecture | regex_replace('^(aarch64)$', 'linux-arm64') | regex_replace('^(x86_64)$', 'linux-x64') }}"
+    node_path: "{{ node_ver }}-{{ node_arch }}"
+
+    ipamnet: "172.18.0.0/16"
+    ipamgw: "172.18.0.2"
+
+    pgip: "172.18.0.10"
+    pghost: pghost
+    pgport: 5432
+    pgdb: pgdb
+    pguser: postgres
+    pgpass: pgpass
+
+    iptables_dir: /var/lib/iptables
+    iptables_rules: "{{ iptables_dir }}/rules-save"
+    iptables_svc: iptables-restore
+    iptables_dport: 443
+    iptables_toport: 3000
+
+    my_env_vars:
+      PATH: "{{ ansible_env.PATH }}:{{ nodejs_dir }}//node-{{ node_path }}/bin"
+
+  tasks:
+    - name: Set hostname
+      tags: host
+      ansible.builtin.hostname:
+        name: "{{ my_hostname }}"
+
+    - name: Set the hostname file content
+      tags: host
+      ansible.builtin.copy:
+        dest: "/etc/hostname"
+        content: "{{ my_hostname }}"
+        mode: '0644'
+
+    - name: Add build.opensuse.org repositories for leap
+      tags: host
+      community.general.zypper_repository:
+        repo: "{{ item }}"
+        auto_import_keys: true
+        autorefresh: true
+      with_items:
+        - https://download.opensuse.org/repositories/devel:/languages:/go/{{ leapver }}/devel:languages:go.repo
+        - https://download.opensuse.org/repositories/devel:/kubic/{{ leapver }}/devel:kubic.repo
+        - https://download.opensuse.org/repositories/Virtualization:/containers/{{ leapver }}/Virtualization:containers.repo
+      when: ansible_distribution == "openSUSE Leap"
+
+    - name: Add GPG key and repository for Google Cloud packages
+      tags: host
+      when: ansible_distribution != 'Amazon'  # Exclude Amazon Linux
+      block:
+        - name: Add Google Cloud GPG key for dpkg based systems
+          ansible.builtin.get_url:
+            url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+            dest: /tmp/apt-key.gpg
+            mode: '0644'
+          when: ansible_os_family == 'Debian'
+
+        - name: Add GPG key to dir of trusted keys
+          ansible.builtin.shell:
+            cmd: gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg < /tmp/apt-key.gpg
+            creates: /usr/share/keyrings/cloud.google.gpg
+          when: ansible_os_family == 'Debian'
+
+        - name: Add Google Cloud site for dpkg based systems
+          ansible.builtin.apt_repository:
+            repo: deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main
+            state: present
+            filename: google-cloud-sdk.list
+            update_cache: true
+          when: ansible_os_family == 'Debian'
+
+        - name: Add Google Cloud GPG key for RPM based systems
+          ansible.builtin.rpm_key:
+            key: https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+            state: present
+          when: ansible_os_family == 'RedHat' or ansible_os_family == 'Suse'
+
+        - name: Add Google Cloud site for dnf or zypper based systems
+          community.general.zypper_repository:
+            repo: https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
+            name: "Google Cloud CLI"
+            auto_import_keys: true
+            autorefresh: true
+          when: ansible_os_family == 'RedHat' or ansible_os_family == 'Suse'
+
+    - name: Install some common packages
+      tags: host
+      ansible.builtin.package:
+        name:
+          - bzip2
+          - gcc
+          - git
+          - make
+          - osc
+          - perl
+          - rsync
+          - unzip
+          - google-cloud-cli
+          - google-cloud-cli-gke-gcloud-auth-plugin
+        state: present
+
+    - name: Install deb packages
+      tags: host,docker
+      ansible.builtin.package:
+        name:
+          - docker.io
+          - postgresql-client
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Install rpm packages
+      tags: host,docker,iptables
+      ansible.builtin.package:
+        name:
+          - docker
+          - emacs-nox
+          - firewalld
+          - go
+          - gvim
+          - iptables
+          - kernel-devel
+          - kernel-default-devel
+          - kubectl
+          - postgresql16
+          - python311-requests
+          - xz
+        state: present
+      when: ansible_distribution == "openSUSE Leap"
+
+    - name: Install snap package
+      tags: snap
+      community.general.snap:
+        name: "{{ item }}"
+        state: present
+        classic: true
+      with_items:
+        - go
+        - kubectl
+      when: ansible_os_family == 'Debian'
+
+    - name: Create user id
+      tags: host
+      ansible.builtin.user:
+        name: "{{ notvagrant }}"
+        shell: /bin/bash
+        state: present
+        groups: users,docker
+
+    - name: Add vimrc conf files to user home
+      tags: host
+      become: true
+      become_user: "{{ notvagrant }}"
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /home/{{ notvagrant }}
+        mode: "0644"
+      with_items:
+        - /vagrant/provisioning/.vimrc
+
+    - name: Ensure passwordless sudo for {{ notvagrant }}
+      tags: host
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ notvagrant }}"
+        content: "{{ notvagrant }} ALL=(ALL) NOPASSWD: ALL"
+        mode: "400"
+
+    - name: Add developer authorized_keys for remote user
+      tags: host
+      ansible.posix.authorized_key:
+        user: "{{ notvagrant }}"
+        key: "{{ item }} {{ notvagrant }}"
+        state: present
+      with_items:
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGnygm4PngHI1rMohD3rwZ8exVUjBp+WQhDuUPOgDkiG
+        - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIMi7opzFIhXv9QVbroDd5ND+ouFwy1kxkzFG4E5nZr
+
+    - name: Make sure env is adjusted for users
+      tags: host
+      ansible.builtin.copy:
+        dest: /etc/profile.d/{{ my_hostname }}.sh
+        content: |
+          export PATH=$PATH:{{ nodejs_dir }}/node-{{ node_path }}/bin
+          export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+          export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+          export GOPATH=$HOME/.go/common
+        mode: '0755'
+
+    - name: Download Node.js tarball based on architecture
+      tags: node
+      ansible.builtin.get_url:
+        url: https://nodejs.org/dist/{{ node_ver }}/node-{{ node_path }}.tar.xz
+        dest: /tmp
+        mode: '0644'
+
+    - name: Creates nodejs directory
+      tags: node
+      ansible.builtin.file:
+        dest: "{{ nodejs_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Extract Node.js tarball
+      tags: node
+      ansible.builtin.unarchive:
+        src: /tmp/node-{{ node_path }}.tar.xz
+        dest: "{{ nodejs_dir }}"
+        remote_src: true
+
+    - name: Download NVM installation script
+      tags: node
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_ver }}/install.sh
+        dest: /tmp/install_nvm.sh
+        mode: '0755'
+
+    - name: Execute NVM installation script
+      tags: node
+      ansible.builtin.script: /tmp/install_nvm.sh
+
+    - name: Install node packages globally
+      tags: yarn,node
+      community.general.npm:
+        name: "{{ item }}"
+        global: true
+      environment: "{{ my_env_vars }}"
+      with_items:
+        - yarn
+
+    - name: Determine public interface name
+      tags: iptables
+      ansible.builtin.set_fact:
+        public_ifname: "{{ ansible_default_ipv4.interface }}"
+
+    - name: Apply iptables rule with dynamic interface name
+      tags: iptables
+      ansible.builtin.shell: |
+        iptables -t nat -A PREROUTING -i {{ public_ifname }} -p tcp --dport {{ iptables_dport }} -j REDIRECT --to-port {{ iptables_toport }}
+      changed_when: false
+
+    - name: Creates directory {{ iptables_dir }}
+      tags: iptables
+      ansible.builtin.file:
+        dest: "{{ iptables_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Create rules on VM up without provisioning for service {{ iptables_rules }}
+      tags: iptables
+      ansible.builtin.shell: "iptables-save > {{ iptables_rules }}"
+      changed_when: false
+
+    - name: Create systemd service to load iptables save on VM startup
+      tags: iptables
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ iptables_svc }}.service"
+        content: |
+          [Unit]
+          Description=Restore iptables firewall rules
+          Before=network.target
+          Conflicts=shutdown.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=iptables-restore {{ iptables_rules }}
+
+          [Install]
+          WantedBy=basic.target
+        mode: '0755'
+
+    - name: Systemd daemon-reload
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: Systemd start and enable some services
+      tags: iptables,docker,postgres
+      ansible.builtin.service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      with_items:
+#        - "{{ iptables_svc }}"
+        - docker
+
+    - name: "Add docker db to hosts file"
+      tags: docker,postgres
+      ansible.builtin.lineinfile:
+        dest: /etc/hosts
+        regexp: '.*{{ pghost }}$'
+        line: "{{ pgip }} {{ pghost }}"
+        state: present
+
+    - name: Create a network with custom IPAM config
+      tags: docker,postgres
+      community.docker.docker_network:
+        name: dockernet
+        ipam_config:
+          - subnet: "{{ ipamnet }}"
+            gateway: "{{ ipamgw }}"
+
+    - name: Create db container and connect to network
+      tags: docker,postgres
+      community.docker.docker_container:
+        name: postgres
+        image: "postgres:latest"
+        restart_policy: "unless-stopped"
+        networks:
+          - name: "dockernet"
+            ipv4_address: "{{ pgip }}"
+        volumes:
+          - /var/lib/postgresql:/var/lib/postgresql
+        exposed_ports:
+          - "{{ pgport }}"
+        env:
+          POSTGRES_PASSWORD: "{{ pgpass }}"
+          POSTGRES_DB: "{{ pgdb }}"
+
+    # wildly insecure to show store credentials
+    # but this is a host local development container
+    - name: Create pgpass for user
+      tags: host,postgres
+      ansible.builtin.copy:
+        dest: /home/{{ notvagrant }}/.pgpass
+        content: |
+          {{ pghost }}:{{ pgport }}:{{ pgdb }}:{{ pguser }}:{{ pgpass }}
+        owner: "{{ notvagrant }}"
+        mode: '0600'
+
+    - name: Something to make sure psql container is up and ready for db init
+      tags: postgres
+      when: ansible_distribution != 'Amazon'  # Exclude Amazon Linux
+      block:
+        - name: Get infos on container
+          community.docker.docker_container_info:
+            name: postgres
+          register: result
+
+        - name: Does container exist?
+          ansible.builtin.debug:
+            msg: "The container {{ 'exists' if result.exists else 'does not exist' }}"
+
+        - name: Print information about postgres container
+          ansible.builtin.debug:
+            var: result.container
+          when: result.exists
