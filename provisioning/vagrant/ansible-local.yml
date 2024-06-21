@@ -57,7 +57,7 @@
       with_items:
         - https://download.opensuse.org/repositories/devel:/languages:/go/{{ leapver }}/devel:languages:go.repo
         - https://download.opensuse.org/repositories/devel:/kubic/{{ leapver }}/devel:kubic.repo
-        - https://download.opensuse.org/repositories/Virtualization:/containers/{{ leapver }}/Virtualization:containers.repo
+      # - https://download.opensuse.org/repositories/Virtualization:/containers/{{ leapver }}/Virtualization:containers.repo
       when: ansible_distribution == "openSUSE Leap"
 
     - name: Add GPG key and repository for Google Cloud packages
