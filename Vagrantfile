@@ -2,8 +2,6 @@
 # vi: set ft=ruby :
 
 require 'yaml'
-#setup = YAML.load_file('_aux/config.yml')
-#setup['external_ip'] = '172.21.1.2' unless setup['external_ip']
 
 Vagrant.configure("2") do |config|
   # The most common configuration options are documented and commented below.
@@ -18,9 +16,8 @@ Vagrant.configure("2") do |config|
 
   # decide on provider and box to use (as again, that can be restrictive)
   if is_arm64()
-    #config.vm.box = "opensuse/Leap-15.5.aarch64"
-    config.vm.box = "bento/opensuse-leap-15.6"
-    #config.vm.box = "bento/ubuntu-24.04"
+    #config.vm.box = "opensuse/Leap-15.6.aarch64"
+    config.vm.box = "bento/ubuntu-24.04"
     # config.vm.box = "focal-server2"
     provider = "vmware_fusion"
   else
@@ -105,7 +102,7 @@ Vagrant.configure("2") do |config|
         ;;
       opensuse-leap)
         zypper ref
-        zypper -n up -y
+        zypper -n update -y
         zypper in -y python311-pip python311
         pip3 install --upgrade ansible ansible-base ansible-core ansible-lint yamllint
         ;;
@@ -144,7 +141,7 @@ Vagrant.configure("2") do |config|
     "",
     "# The postgresql db container is cli accessible",
     "",
-    "  vvroom:~> psql -U postgres -h pghost pgdb",
+    "  guestvm:~> psql -U postgres -h pghost pgdb",
     "",
     "##########################################################################",
     "",

@@ -294,7 +294,7 @@
         enabled: true
         state: started
       with_items:
-#        - "{{ iptables_svc }}"
+        - "{{ iptables_svc }}"
         - docker
 
     - name: "Add docker db to hosts file"
@@ -337,6 +337,7 @@
       ansible.builtin.copy:
         dest: /home/{{ notvagrant }}/.pgpass
         content: |
+          {{ pghost }}:{{ pgport }}:postgres:postgres:postgres
           {{ pghost }}:{{ pgport }}:{{ pgdb }}:{{ pguser }}:{{ pgpass }}
         owner: "{{ notvagrant }}"
         mode: '0600'
