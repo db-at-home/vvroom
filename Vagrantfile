@@ -34,7 +34,10 @@ Vagrant.configure("2") do |config|
 
   # Create a private network, which allows host-only access to the machine
   # using a specific IP.
-  config.vm.network "private_network", ip: "192.168.56.12"
+  config.vm.network "public_network", bridge: "br0"
+  config.vm.provision "shell",
+    run: "always",
+    inline: "ip route del default via 10.0.2.2 || true && sudo ip route add default via 192.168.88.2 dev eth1 || true"
 
   # Share an additional folder to the guest VM. The first argument is
   # the path on the host to the actual folder. The second argument is
@@ -57,7 +60,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider provider do |prov|
 
     # Display the VirtualBox GUI when booting the machine
-    prov.gui = true
+    #prov.gui = true
 
     # Customize the cpu count and memory on the VM:
     prov.memory = "4096"
