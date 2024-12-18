@@ -107,7 +107,7 @@ Vagrant.configure("2") do |config|
         zypper ref
         zypper -n update -y
         zypper in -y python311-pip python311
-        pip3 install --upgrade ansible ansible-base ansible-core ansible-lint yamllint
+        pip3 install --upgrade ansible ansible-base ansible-core ansible-lint yamllint GitPython
         ;;
     esac
   SHELL
