@@ -105,9 +105,13 @@
         name:
           - bzip2
           - chrpath
+          - cpio
           - diffstat
+          - file
+          - gawk
           - gcc
           - git
+          - libacl1
           - make
           - osc
           - perl
@@ -116,11 +120,13 @@
           - unzip
           - google-cloud-cli
           - google-cloud-cli-gke-gcloud-auth-plugin
-          - python
+          - patch
           - python3
           - python3-pexpect
           - python3-pip
+          - texinfo
           - wget
+          - zstd
         state: present
 
     - name: Install deb packages
@@ -130,15 +136,17 @@
           - docker.io
           - postgresql-client
           - build-essential
-          - cpio
+          - chrpath
           - debianutils
-          - gawk
           - gcc-multilib
           - git-core
           - iputils-ping
+          - liblz4-tool
           - libsdl1.2-dev
-          - texinfo
-          - unzip
+          - locales
+          - python3-git
+          - python3-jinja2
+          - python3-subunit
           - xz-utils
         state: present
       when: ansible_os_family == "Debian"
@@ -151,19 +159,23 @@
           - emacs-nox
           - firewalld
           - go
+          - gzip
           - gvim
+          - hostname
           - iptables
           - kernel-devel
           - kernel-default-devel
           - kubectl
+          - lz4
+          - makeinfo
           - postgresql16
           - python311-requests
+          - rpcgen
           - xz
           - gcc-c++
           - libSDL-devel
           - makeinfo
-          - patch
-          - python-curses
+          - python3-Jinja2
           - python-xml
           - python3-curses
           - tar
